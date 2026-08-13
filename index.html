@@ -94,7 +94,6 @@ nav{background:var(--black);border-bottom:2px solid var(--gold);padding:12px 20p
 .timer-lbl{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--light);margin-bottom:4px;}
 .timer{font-family:"DM Mono",monospace;font-size:44px;font-weight:500;color:var(--dark);line-height:1;margin-bottom:5px;transition:color .3s;}
 .timer-kat{font-size:12px;font-weight:600;color:white;padding:3px 12px;border-radius:20px;display:inline-block;background:var(--light);}
-.timer-start{background:var(--green);color:white;border:none;border-radius:8px;padding:10px 24px;font-family:"Poppins",sans-serif;font-size:14px;font-weight:800;cursor:pointer;margin-top:10px;width:100%;}
 
 .kat-sekce-title{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--light);margin-bottom:6px;margin-top:8px;}
 .kat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
@@ -356,17 +355,16 @@ footer{background:#0a0a0a;padding:16px 20px;display:flex;justify-content:space-b
   </div>
 
   <div class="instrukce">
-    <strong>Jak měřit:</strong> Klikněte na tlačítko vždy na <strong>začátku</strong> dané činnosti. Aplikace automaticky ukončí předchozí a začne měřit novou. Až cyklus skončí, klikněte STOP.
+    <strong>Jak měřit:</strong> Klikněte na tlačítko vždy na <strong>začátku</strong> dané činnosti. Časomíra se spustí prvním kliknutím. Aplikace automaticky ukončí předchozí a začne měřit novou. Až cyklus skončí, klikněte STOP.
   </div>
 
   <div class="timer-box">
     <div class="timer-lbl">Čas cyklu</div>
     <div class="timer" id="timer">00:00</div>
-    <div class="timer-kat" id="timer-kat">Čeká na START</div>
-    <button class="timer-start" id="btn-start" onclick="startMereni()">START - spustit měření</button>
+    <div class="timer-kat" id="timer-kat">Klikněte na první činnost</div>
   </div>
 
-  <div id="tlacitka-wrap" style="display:none;">
+  <div id="tlacitka-wrap">
     <div class="kat-sekce-title">Přidaná hodnota</div>
     <div class="kat-grid" id="grid-hodnota">
       <button class="kat-btn k-prace" onclick="setKat('prace','Práce','#2a7a4f')">
@@ -532,7 +530,6 @@ let delkaSmeny = 7.5;
 let nazev = '', maxCyklu = 10, pocetKusu = 0;
 let cykly = [], aktCyklus = null, aktivniKat = null;
 let timerInt = null, katInt = null, cyklusStart = null;
-let mereniSpusteno = false;
 
 // =============================================
 // SETUP
@@ -606,32 +603,33 @@ function spustit() {
 // =============================================
 // MĚŘENÍ
 // =============================================
-function startMereni() {
-  mereniSpusteno = true;
-  document.getElementById('btn-start').style.display = 'none';
-  document.getElementById('tlacitka-wrap').style.display = 'block';
-  document.getElementById('timer-kat').textContent = 'Vyberte činnost';
-  document.getElementById('timer-kat').style.background = 'var(--light)';
-}
-
 function zacitNovyCyklus() {
   const cas = {};
   vsechnyKat.forEach(k => cas[k] = 0);
   aktCyklus = {start: Date.now(), cas, celkem: 0};
   aktivniKat = null;
-  cyklusStart = Date.now();
+  cyklusStart = null;
   vsechnyKat.forEach(k => { const el = document.getElementById('k-'+k); if(el) el.textContent = '0:00'; });
   document.querySelectorAll('.kat-btn').forEach(b => { b.classList.remove('on'); if(b.classList.contains('k-vlastni')){b.style.background='';b.style.color='';} });
   document.getElementById('btn-stop').style.display = 'block';
   document.getElementById('btn-novy').style.display = 'none';
   document.getElementById('btn-konec').style.display = 'none';
   document.getElementById('m-cykly').textContent = 'Cyklus ' + (cykly.length + 1) + ' / ' + maxCyklu;
-  clearInterval(timerInt); timerInt = setInterval(updateTimer, 100);
-  clearInterval(katInt); katInt = setInterval(updateKat, 100);
+  document.getElementById('timer').textContent = '00:00';
+  document.getElementById('timer').style.color = 'var(--dark)';
+  document.getElementById('timer-kat').textContent = 'Klikněte na první činnost';
+  document.getElementById('timer-kat').style.background = 'var(--light)';
+  clearInterval(timerInt);
+  clearInterval(katInt);
 }
 
 function setKat(kat, nazevKat, barva) {
-  if (!aktCyklus || !mereniSpusteno) return;
+  if (!aktCyklus) return;
+  if (!cyklusStart) {
+    cyklusStart = Date.now();
+    clearInterval(timerInt); timerInt = setInterval(updateTimer, 100);
+    clearInterval(katInt); katInt = setInterval(updateKat, 100);
+  }
   document.querySelectorAll('.kat-btn').forEach(b => { b.classList.remove('on'); if(b.classList.contains('k-vlastni')){b.style.background='';b.style.color='';} });
   const btn = document.getElementById('btn-'+kat) || document.querySelector('.k-'+kat);
   if (btn) { btn.classList.add('on'); if(kat.startsWith('op_')){btn.style.background=barva;btn.style.color='white';} }
@@ -656,6 +654,7 @@ function updateKat() {
 }
 
 function stopCyklus() {
+  if (!cyklusStart) { alert('Nejdřív klikněte na některou činnost, pak můžete cyklus ukončit.'); return; }
   clearInterval(timerInt); clearInterval(katInt);
   document.querySelectorAll('.kat-btn').forEach(b => { b.classList.remove('on'); if(b.classList.contains('k-vlastni')){b.style.background='';b.style.color='';} });
   aktivniKat = null;
@@ -712,7 +711,7 @@ function ukoncit() {
   cykly.forEach((c,i) => {
     h += `<tr><td>${i+1}</td>` + vsechnyKat.map(k=>`<td>${fmtC(c.cas[k]||0)}</td>`).join('') + `<td>${fmtC(c.celkem)}</td></tr>`;
   });
-  h += '<tr class="avg"><td>Avg</td>' + vsechnyKat.map(k=>`<td>${fmtC(avg[k])}</td>`).join('') + `<td>${fmtC(avgC)}</td></tr>`;
+  h += '<tr class="avg"><td>Průměr</td>' + vsechnyKat.map(k=>`<td>${fmtC(avg[k])}</td>`).join('') + `<td>${fmtC(avgC)}</td></tr>`;
   h += '<tr class="ply"><td>Plý.</td>' + vsechnyKat.map(k=>`<td>${PLYTVANI.includes(k)?fmtC(avg[k]):'-'}</td>`).join('') + `<td>${fmtC(plyC)} (${plyPct}%)</td></tr>`;
   tbl.innerHTML = h;
 
@@ -938,7 +937,7 @@ function stahnoutCSV() {
   csv += 'Prumer;' + vsechnyKat.map(k=>fmtC(avg[k])).join(';') + ';' + fmtC(avgC) + '\n\n';
   csv += 'Plytvani;;' + fmtC(plyC) + ';;' + plyPct + '%\n';
 
-  const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8;'});
+  const blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -1074,7 +1073,7 @@ footer{margin-top:32px;padding-top:12px;border-top:1px solid #eee;font-size:10px
   <thead><tr><th>#</th>${vsechnyKat.map(k=>`<th>${getNazev(k)}</th>`).join('')}<th>Celkem</th></tr></thead>
   <tbody>
     ${cykly.map((c,i)=>`<tr><td>${i+1}</td>${vsechnyKat.map(k=>`<td>${fmtC(c.cas[k]||0)}</td>`).join('')}<td><strong>${fmtC(c.celkem)}</strong></td></tr>`).join('')}
-    <tr class="avg"><td>Avg</td>${avgRow}</tr>
+    <tr class="avg"><td>Průměr</td>${avgRow}</tr>
     <tr class="ply"><td>Plý.</td>${plyRow}</tr>
   </tbody>
 </table>
@@ -1140,7 +1139,7 @@ function kopirovat() {
 }
 
 function zacitZnovu() {
-  cykly = []; aktCyklus = null; aktivniKat = null; mereniSpusteno = false;
+  cykly = []; aktCyklus = null; aktivniKat = null; cyklusStart = null;
   vlastniOp = []; vsechnyKat = [];
   document.getElementById('grid-hodnota').innerHTML = `
     <button class="kat-btn k-prace" onclick="setKat('prace','Práce','#2a7a4f')">
@@ -1150,11 +1149,9 @@ function zacitZnovu() {
   document.getElementById('operace-list').innerHTML = '';
   document.getElementById('souhrn').style.display = 'none';
   document.getElementById('setup').style.display = 'block';
-  document.getElementById('btn-start').style.display = 'block';
-  document.getElementById('tlacitka-wrap').style.display = 'none';
   document.getElementById('timer').textContent = '00:00';
   document.getElementById('timer').style.color = 'var(--dark)';
-  document.getElementById('timer-kat').textContent = 'Čeká na START';
+  document.getElementById('timer-kat').textContent = 'Klikněte na první činnost';
   document.getElementById('timer-kat').style.background = 'var(--light)';
   window.scrollTo({top:0,behavior:'smooth'});
 }
